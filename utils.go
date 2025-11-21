@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -14,6 +15,28 @@ import (
 	"github.com/paulmach/orb/maptile/tilecover"
 	log "github.com/sirupsen/logrus"
 )
+
+// tileExistsInMBTile 检查瓦片是否已存在于 MBTiles 数据库中
+func tileExistsInMBTile(tile maptile.Tile, db *sql.DB) bool {
+	if db == nil {
+		return false
+	}
+	var count int
+	flipY := uint32(math.Pow(2.0, float64(tile.Z))) - 1 - tile.Y
+	row := db.QueryRow("SELECT COUNT(*) FROM tiles WHERE zoom_level = ? AND tile_column = ? AND tile_row = ?", tile.Z, tile.X, flipY)
+	err := row.Scan(&count)
+	if err != nil {
+		return false
+	}
+	return count > 0
+}
+
+// tileExistsInFiles 检查瓦片文件是否已存在于文件系统中
+func tileExistsInFiles(tile maptile.Tile, task *Task) bool {
+	fileName := filepath.Join(task.File, fmt.Sprintf(`%d`, tile.Z), fmt.Sprintf(`%d`, tile.X), fmt.Sprintf(`%d.%s`, tile.Y, task.TileMap.Format))
+	_, err := os.Stat(fileName)
+	return err == nil
+}
 
 func saveToMBTile(tile Tile, db *sql.DB) error {
 	_, err := db.Exec("insert into tiles (zoom_level, tile_column, tile_row, tile_data) values (?, ?, ?, ?);", tile.T.Z, tile.T.X, tile.flipY(), tile.C)

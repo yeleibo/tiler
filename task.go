@@ -51,6 +51,7 @@ type Task struct {
 	savingpipe         chan Tile
 	tileSet            Set
 	outformat          string
+	skipExisting       bool
 }
 
 // NewTask 创建下载任务
@@ -90,6 +91,7 @@ func NewTask(layers []Layer, m TileMap) *Task {
 	task.tileSet = Set{M: make(maptile.Set)}
 
 	task.outformat = viper.GetString("output.format")
+	task.skipExisting = viper.GetBool("task.skipexisting")
 	return &task
 }
 
@@ -143,9 +145,12 @@ func (task *Task) SetupMBTileTables() error {
 	if task.File == "" {
 		outdir := viper.GetString("output.directory")
 		os.MkdirAll(outdir, os.ModePerm)
-		task.File = filepath.Join(outdir, fmt.Sprintf("%s-z%d-%d.%s.mbtiles", task.Name, task.Min, task.Max, task.ID))
+		task.File = filepath.Join(outdir, fmt.Sprintf("%s-z%d-%d.mbtiles", task.Name, task.Min, task.Max))
 	}
-	os.Remove(task.File)
+	// 如果启用跳过已存在瓦片，不删除现有数据库文件
+	if !task.skipExisting {
+		os.Remove(task.File)
+	}
 	db, err := sql.Open("sqlite3", task.File)
 	if err != nil {
 		return err
@@ -237,6 +242,20 @@ func (task *Task) tileFetcher(mt maptile.Tile, url string) {
 	defer func() {
 		<-task.workers //workers完成并清退
 	}()
+
+	// 如果启用了跳过已存在瓦片的功能，检查瓦片是否已存在
+	if task.skipExisting {
+		var exists bool
+		if task.outformat == "mbtiles" {
+			exists = tileExistsInMBTile(mt, task.db)
+		} else {
+			exists = tileExistsInFiles(mt, task)
+		}
+		if exists {
+			log.Debugf("tile(z:%d, x:%d, y:%d) already exists, skipping...", mt.Z, mt.X, mt.Y)
+			return
+		}
+	}
 
 	prep := func(t maptile.Tile, url string) string {
 		url = strings.Replace(url, "{x}", strconv.Itoa(int(t.X)), -1)
@@ -370,7 +389,7 @@ func (task *Task) Download() {
 	} else {
 		if task.File == "" {
 			outdir := viper.GetString("output.directory")
-			task.File = filepath.Join(outdir, fmt.Sprintf("%s-z%d-%d.%s", task.Name, task.Min, task.Max, task.ID))
+			task.File = filepath.Join(outdir, fmt.Sprintf("%s-z%d-%d", task.Name, task.Min, task.Max))
 		}
 		os.MkdirAll(task.File, os.ModePerm)
 	}

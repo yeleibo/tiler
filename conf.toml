@@ -1,52 +1,49 @@
 [app]
+	# 应用版本
 	version = "v 0.1.0"
+	# 应用标题
 	title = "MapCloud Tiler"
-[output]
-	#can be mbtiles/file
-	format ="file"
-	#the output dir
-	directory ="output"
-[task]
-	#number of fetchers
-	workers = 3
-	#number of savers
-	savepipe = 1
-	#min request interval, a speed limit, unit millisecond
-	timedelay = 50
 
+[output]
+	# 输出格式，可以是 mbtiles 或者文件
+	format = "file"
+	# 输出的目录
+	directory = "output"
+
+[task]
+	# 并发下载线程数，控制同时进行的HTTP请求数量（建议1-50，过大可能被服务器限流）
+	workers = 20
+	# 保存队列缓冲区大小，仅对mbtiles格式有效，控制等待写入数据库的瓦片数量
+	savepipe = 20
+	# 发送请求的时间间隔（毫秒），用于控制下载速度，避免请求过快被服务器封禁
+	timedelay = 50
+	# 是否跳过已下载的瓦片，启用后支持断点续传（true=跳过已存在, false=重新下载所有）
+	skipexisting = true
 [tm]
-	#name for mbtiles
-	name = "google satelite"
-	#max and min level for mbtiles
+	# mbtiles 文件的名称
+	name = "wuhan-google-satelite"
+	# 设置 mbtiles 的最大层级和最小层级
 	min = 0
-	max = 11
-	#can be pbf/png/jpg
+	max = 20
+	# 输出的图像格式，可以是 pbf（矢量图），png 或 jpg（栅格图）
 	format = "jpg"
-	#can be xyz/tm
+	# 使用的瓦片方案，通常是 xyz 或 tm
 	schema = "xyz"
-	#the vector tiles metadata tilejson
+	# 这部分是瓦片的元数据，TileJSON 格式
 	# json = ""
-	#url is the schema url of tiles
+	# 瓦片的 URL 模板（此处是 Google 卫星地图）
+	url = "http://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+	# 其他可能的 URL 模板，如 Mapbox 或 Tianditu 的瓦片服务
 	# url = "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/{z}/{x}/{y}.vector.pbf?sku=1016gFniej06a&access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4M29iazA2Z2gycXA4N2pmbDZmangifQ.-g_vE53SD2WrJ6tFX7QHmA"
 	# url = "https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2/{z}/{x}/{y}.vector.pbf?sku=1016gFniej06a&access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4M29iazA2Z2gycXA4N2pmbDZmangifQ.-g_vE53SD2WrJ6tFX7QHmA"
 	# url = "https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf?key=KDhMfHvorAFkFe64wlZb"
-	# url = "http://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
 	# url = "https://t0.tianditu.gov.cn/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=75f0434f240669f4a2df6359275146d2"
-	url = "https://t0.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=75f0434f240669f4a2df6359275146d2"
-#lrs can set diff boundaries for diff levels
-  [[lrs]]
-  	min = 0
-  	max = 5
-  	geojson = "./geojson/global.geojson"
- [[lrs]]
- 	min = 6
- 	max = 8
- 	geojson = "./geojson/china.geojson"
-  [[lrs]]
- 	min = 9
-  	max = 10
-  	geojson = "./geojson/jiangsu.geojson"
- [[lrs]]
-  	min = 11
-  	max = 11
-  	geojson = "./geojson/nanjing.geojson"
+	# url = "https://t0.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=75f0434f240669f4a2df6359275146d2"
+
+# lrs 可以为不同级别的瓦片设置不同的边界
+[[lrs]]
+  	# 设置 lrs 的最小和最大层级
+  	min = 1
+  	max = 20
+  	# 使用 geojson 文件来定义需要的区域
+  	geojson = "./geojson/wuhan.geojson"

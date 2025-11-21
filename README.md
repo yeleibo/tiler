@@ -16,7 +16,8 @@ A well-polished tile downloader
 - 支持文件和MBTILES两种存储方式
 
 - 支持自定义瓦片地址
-
+## 打包
+ go build -ldflags="-s -w" -o tiler.exe
 ## 使用方式
 
 1. 下载源代码在对应的平台上自己编译
@@ -58,3 +59,6 @@ A well-polished tile downloader
   > url = "https://t0.tianditu.gov.cn/DataServer?T=cva_w&x={x}&y={y}&l={z}&tk=75f0434f240669f4a2df6359275146d2"
 
 > 工具已经处理了天地图429限制，请合理使用！！！
+
+## 获取geojson
+https://datav.aliyun.com/portal/school/atlas/area_selector
