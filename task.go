@@ -148,7 +148,7 @@ func (task *Task) SetupMBTileTables() error {
 	if task.File == "" {
 		outdir := viper.GetString("output.directory")
 		os.MkdirAll(outdir, os.ModePerm)
-		task.File = filepath.Join(outdir, fmt.Sprintf("%s-z%d-%d.mbtiles", task.Name, task.Min, task.Max))
+		task.File = filepath.Join(outdir, fmt.Sprintf("%s.mbtiles", task.Name))
 	}
 	// 如果启用跳过已存在瓦片，不删除现有数据库文件
 	if !task.skipExisting {
@@ -423,7 +423,7 @@ func (task *Task) Download() {
 	} else {
 		if task.File == "" {
 			outdir := viper.GetString("output.directory")
-			task.File = filepath.Join(outdir, fmt.Sprintf("%s-z%d-%d", task.Name, task.Min, task.Max))
+			task.File = filepath.Join(outdir, task.Name)
 		}
 		os.MkdirAll(task.File, os.ModePerm)
 	}

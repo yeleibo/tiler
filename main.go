@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -63,6 +64,35 @@ func initConf(cfgFile string) {
 	viper.SetDefault("task.workers", 4)
 	viper.SetDefault("task.savepipe", 1)
 	viper.SetDefault("task.timedelay", 0)
+	viper.SetDefault("log.enable", false)
+	viper.SetDefault("log.file", "tiler.log")
+	viper.SetDefault("log.level", "info")
+}
+
+// setupLogger 设置日志输出
+func setupLogger() {
+	// 设置日志级别
+	levelStr := viper.GetString("log.level")
+	level, err := log.ParseLevel(levelStr)
+	if err != nil {
+		level = log.InfoLevel
+	}
+	log.SetLevel(level)
+
+	// 如果启用日志文件
+	if viper.GetBool("log.enable") {
+		logFile := viper.GetString("log.file")
+		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			log.Warnf("Failed to open log file %s: %v, logging to stdout only", logFile, err)
+			return
+		}
+
+		// 同时输出到文件和控制台
+		mw := io.MultiWriter(ansicolor.NewAnsiColorWriter(os.Stdout), file)
+		log.SetOutput(mw)
+		log.Infof("Logging to file: %s", logFile)
+	}
 }
 
 type TileData struct {
@@ -175,6 +205,7 @@ func main() {
 		cf = "conf.toml"
 	}
 	initConf(cf)
+	setupLogger() // 设置日志输出
 	start := time.Now()
 	tm := TileMap{
 		Name:   viper.GetString("tm.name"),

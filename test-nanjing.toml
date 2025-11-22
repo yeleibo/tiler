@@ -1,0 +1,32 @@
+[app]
+	version = "v 0.1.0"
+	title = "MapCloud Tiler"
+
+[log]
+	enable = true
+	file = "tiler-test.log"
+	level = "debug"
+
+[output]
+	format = "file"
+	directory = "output-test"
+
+[task]
+	workers = 1
+	savepipe = 1
+	timedelay = 100
+	skipexisting = true
+	resume = false
+
+[tm]
+	name = "nanjing-test"
+	min = 10
+	max = 10
+	format = "jpg"
+	schema = "xyz"
+	url = "http://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+
+[[lrs]]
+	min = 10
+	max = 10
+	geojson = "./geojson/nanjing.geojson"

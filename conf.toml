@@ -4,6 +4,14 @@
 	# 应用标题
 	title = "MapCloud Tiler"
 
+[log]
+	# 是否启用日志文件记录（true=启用, false=仅输出到控制台）
+	enable = true
+	# 日志文件路径（相对或绝对路径）
+	file = "tiler.log"
+	# 日志级别：debug, info, warn, error（只有大于等于此级别的日志会被记录）
+	level = "info"
+
 [output]
 	# 输出格式，可以是 mbtiles 或者文件
 	format = "file"
@@ -12,9 +20,9 @@
 
 [task]
 	# 并发下载线程数，控制同时进行的HTTP请求数量（建议1-50，过大可能被服务器限流）
-	workers = 20
+	workers = 30
 	# 保存队列缓冲区大小，仅对mbtiles格式有效，控制等待写入数据库的瓦片数量
-	savepipe = 20
+	savepipe = 200
 	# 发送请求的时间间隔（毫秒），用于控制下载速度，避免请求过快被服务器封禁
 	timedelay = 50
 	# 是否跳过已下载的瓦片，启用后支持断点续传（true=跳过已存在, false=重新下载所有）

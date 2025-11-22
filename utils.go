@@ -94,7 +94,7 @@ func optimizeDatabase(db *sql.DB) error {
 func setupProgressDB(task *Task) error {
 	outdir := viper.GetString("output.directory")
 	os.MkdirAll(outdir, os.ModePerm)
-	progressFile := filepath.Join(outdir, fmt.Sprintf("%s-z%d-%d.progress.db", task.Name, task.Min, task.Max))
+	progressFile := filepath.Join(outdir, fmt.Sprintf("%s.progress.db", task.Name))
 
 	// 如果不启用恢复功能，删除旧的进度文件
 	if !task.resume {

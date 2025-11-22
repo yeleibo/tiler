@@ -3,7 +3,10 @@
     "allow": [
       "Bash(go build:*)",
       "Bash(where:*)",
-      "Bash(dir /b *.go)"
+      "Bash(dir /b *.go)",
+      "Bash(go run:*)",
+      "Bash(./tiler.exe:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []
