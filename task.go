@@ -54,6 +54,11 @@ type Task struct {
 	outformat          string
 	skipExisting       bool
 	resume             bool
+	progressBuffer       []maptile.Tile
+	progressMutex        sync.Mutex
+	progressTicker       *time.Ticker
+	progressDone         chan struct{}
+	progressInterval     int
 }
 
 // NewTask 创建下载任务
@@ -95,6 +100,13 @@ func NewTask(layers []Layer, m TileMap) *Task {
 	task.outformat = viper.GetString("output.format")
 	task.skipExisting = viper.GetBool("task.skipexisting")
 	task.resume = viper.GetBool("task.resume")
+	task.progressInterval = viper.GetInt("task.progressinterval")
+
+	// 设置默认值
+	if task.progressInterval <= 0 {
+		task.progressInterval = 10
+	}
+
 	return &task
 }
 
@@ -154,7 +166,7 @@ func (task *Task) SetupMBTileTables() error {
 	if !task.skipExisting {
 		os.Remove(task.File)
 	}
-	db, err := sql.Open("sqlite3", task.File)
+	db, err := sql.Open("sqlite", task.File)
 	if err != nil {
 		return err
 	}
@@ -346,12 +358,11 @@ func (task *Task) tileFetcher(mt maptile.Tile, url string) {
 		task.saveTile(td)
 	}
 
-	// 标记瓦片为已下载
+	// 添加到进度缓冲区（批量写入）
 	if task.resume {
-		err = markTileAsDownloaded(mt, task.progressDB)
-		if err != nil {
-			log.Warnf("failed to mark tile as downloaded: %v", err)
-		}
+		task.progressMutex.Lock()
+		task.progressBuffer = append(task.progressBuffer, mt)
+		task.progressMutex.Unlock()
 	}
 
 	cost := time.Since(start).Milliseconds()
@@ -398,6 +409,55 @@ func (task *Task) downloadLayer(layer Layer) {
 	bar.FinishPrint(fmt.Sprintf("Task %s Zoom %d finished ~", task.ID, layer.Zoom))
 }
 
+// flushProgress 刷新进度缓冲区到数据库
+func (task *Task) flushProgress() {
+	task.progressMutex.Lock()
+	if len(task.progressBuffer) == 0 {
+		task.progressMutex.Unlock()
+		return
+	}
+	// 复制缓冲区并清空
+	tiles := make([]maptile.Tile, len(task.progressBuffer))
+	copy(tiles, task.progressBuffer)
+	task.progressBuffer = task.progressBuffer[:0]
+	task.progressMutex.Unlock()
+
+	// 批量写入数据库
+	err := batchMarkTilesAsDownloaded(tiles, task.progressDB)
+	if err != nil {
+		log.Warnf("failed to batch save progress (%d tiles): %v", len(tiles), err)
+	} else {
+		log.Debugf("progress saved: %d tiles", len(tiles))
+	}
+}
+
+// startProgressFlusher 启动进度刷新定时器
+func (task *Task) startProgressFlusher() {
+	task.progressDone = make(chan struct{})
+	task.progressTicker = time.NewTicker(time.Duration(task.progressInterval) * time.Minute)
+
+	go func() {
+		for {
+			select {
+			case <-task.progressTicker.C:
+				task.flushProgress()
+			case <-task.progressDone:
+				task.progressTicker.Stop()
+				return
+			}
+		}
+	}()
+}
+
+// stopProgressFlusher 停止进度刷新并保存剩余进度
+func (task *Task) stopProgressFlusher() {
+	if task.progressDone != nil {
+		close(task.progressDone)
+	}
+	// 最后刷新一次，保存所有剩余进度
+	task.flushProgress()
+}
+
 // Download 开启下载任务
 func (task *Task) Download() {
 	//g orb.Geometry, minz int, maxz int
@@ -407,6 +467,7 @@ func (task *Task) Download() {
 	task.Bar.Start()
 
 	// 初始化进度数据库
+	startLayerIndex := 0
 	if task.resume {
 		err := setupProgressDB(task)
 		if err != nil {
@@ -414,7 +475,25 @@ func (task *Task) Download() {
 			task.resume = false
 		} else {
 			defer task.progressDB.Close()
+			defer task.stopProgressFlusher() // 确保退出时保存所有进度
+			task.progressBuffer = make([]maptile.Tile, 0, 10000)
+			task.startProgressFlusher() // 启动定时刷新
+
+			// 获取上次中断的层级索引
+			startLayerIndex = getResumePoint(task.progressDB)
+			if startLayerIndex > 0 {
+				log.Infof("Resuming from layer index %d (zoom %d)", startLayerIndex, task.Layers[startLayerIndex].Zoom)
+				// 计算已跳过的瓦片数，更新进度条
+				var skippedCount int64
+				for i := 0; i < startLayerIndex; i++ {
+					skippedCount += task.Layers[i].Count
+				}
+				task.Bar.Add64(skippedCount)
+			} else {
+				log.Info("Starting fresh download")
+			}
 			log.Info("Progress tracking enabled, task can be resumed after interruption")
+			log.Infof("Progress will be saved every %d minutes", task.progressInterval)
 		}
 	}
 
@@ -428,8 +507,20 @@ func (task *Task) Download() {
 		os.MkdirAll(task.File, os.ModePerm)
 	}
 	go task.savePipe()
-	for _, layer := range task.Layers {
-		task.downloadLayer(layer)
+
+	// 从断点位置开始下载
+	for i := startLayerIndex; i < len(task.Layers); i++ {
+		// 保存当前层级索引
+		if task.resume {
+			saveResumePoint(i, task.progressDB)
+		}
+		task.downloadLayer(task.Layers[i])
 	}
+
+	// 下载完成，清除断点记录
+	if task.resume {
+		saveResumePoint(-1, task.progressDB) // -1 表示已完成
+	}
+
 	task.Bar.FinishPrint(fmt.Sprintf("Task %s finished ~", task.ID))
 }

@@ -101,7 +101,7 @@ func setupProgressDB(task *Task) error {
 		os.Remove(progressFile)
 	}
 
-	db, err := sql.Open("sqlite3", progressFile)
+	db, err := sql.Open("sqlite", progressFile)
 	if err != nil {
 		return err
 	}
@@ -124,6 +124,16 @@ func setupProgressDB(task *Task) error {
 		return err
 	}
 
+	// 创建断点记录表，记录当前下载到哪个层级和位置
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS resume_point (
+		id INTEGER PRIMARY KEY CHECK (id = 1),
+		layer_index INTEGER NOT NULL,
+		last_update DATETIME DEFAULT CURRENT_TIMESTAMP
+	)`)
+	if err != nil {
+		return err
+	}
+
 	task.progressDB = db
 	return nil
 }
@@ -135,6 +145,38 @@ func markTileAsDownloaded(tile maptile.Tile, db *sql.DB) error {
 	}
 	_, err := db.Exec("INSERT OR IGNORE INTO downloaded_tiles (z, x, y) VALUES (?, ?, ?)", tile.Z, tile.X, tile.Y)
 	return err
+}
+
+// batchMarkTilesAsDownloaded 批量标记瓦片为已下载
+func batchMarkTilesAsDownloaded(tiles []maptile.Tile, db *sql.DB) error {
+	if db == nil || len(tiles) == 0 {
+		return nil
+	}
+
+	// 开始事务
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 准备批量插入语句
+	stmt, err := tx.Prepare("INSERT OR IGNORE INTO downloaded_tiles (z, x, y) VALUES (?, ?, ?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	// 批量执行插入
+	for _, tile := range tiles {
+		_, err = stmt.Exec(tile.Z, tile.X, tile.Y)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 提交事务
+	return tx.Commit()
 }
 
 // isTileDownloaded 检查瓦片是否已下载（从进度数据库）
@@ -149,6 +191,29 @@ func isTileDownloaded(tile maptile.Tile, db *sql.DB) bool {
 		return false
 	}
 	return count > 0
+}
+
+// saveResumePoint 保存当前下载到的层级索引
+func saveResumePoint(layerIndex int, db *sql.DB) error {
+	if db == nil {
+		return nil
+	}
+	_, err := db.Exec("INSERT OR REPLACE INTO resume_point (id, layer_index, last_update) VALUES (1, ?, datetime('now'))", layerIndex)
+	return err
+}
+
+// getResumePoint 获取上次中断时的层级索引，如果没有记录返回 0
+func getResumePoint(db *sql.DB) int {
+	if db == nil {
+		return 0
+	}
+	var layerIndex int
+	row := db.QueryRow("SELECT layer_index FROM resume_point WHERE id = 1")
+	err := row.Scan(&layerIndex)
+	if err != nil {
+		return 0 // 没有记录，从头开始
+	}
+	return layerIndex
 }
 
 func loadFeature(path string) *geojson.Feature {

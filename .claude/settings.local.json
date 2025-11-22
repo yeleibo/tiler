@@ -6,7 +6,15 @@
       "Bash(dir /b *.go)",
       "Bash(go run:*)",
       "Bash(./tiler.exe:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(go mod tidy:*)",
+      "Bash(.\\tiler.exe:*)",
+      "Bash(timeout:*)",
+      "Bash(tee:*)",
+      "Bash(go version:*)",
+      "Bash(go env:*)",
+      "Bash(set CGO_ENABLED=1:*)",
+      "Bash(tiler.exe)"
     ],
     "deny": [],
     "ask": []

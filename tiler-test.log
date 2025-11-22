@@ -1,9 +1,0 @@
-2025-11-22 13:34:24.350[36m [INFO] [0mLogging to file: tiler-test.log
-2025-11-22 13:34:24.356[36m [INFO] [0mzoom: 10, tiles: 38 
-
-2025-11-22 13:34:26.806[36m [INFO] [0moutput-test\nanjing-test-z10-10\10\850\418.jpg
-2025-11-22 13:34:26.806[36m [INFO] [0mtile(z:10, x:850, y:418), 2348ms , 13.17 kb, http://mt0.google.com/vt/lyrs=s&x=850&y=418&z=10 ...
-
-2025-11-22 13:34:27.942[36m [INFO] [0moutput-test\nanjing-test-z10-10\10\849\418.jpg
-2025-11-22 13:34:27.942[36m [INFO] [0mtile(z:10, x:849, y:418), 1035ms , 14.92 kb, http://mt0.google.com/vt/lyrs=s&x=849&y=418&z=10 ...
-

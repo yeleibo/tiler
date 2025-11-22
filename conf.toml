@@ -10,7 +10,7 @@
 	# 日志文件路径（相对或绝对路径）
 	file = "tiler.log"
 	# 日志级别：debug, info, warn, error（只有大于等于此级别的日志会被记录）
-	level = "info"
+	level = "debug"
 
 [output]
 	# 输出格式，可以是 mbtiles 或者文件
@@ -29,9 +29,11 @@
 	skipexisting = true
 	# 是否启用任务恢复，关闭程序后重新打开可以从上次中断的地方继续下载（true=启用, false=禁用）
 	resume = true
+	# 进度保存间隔时间（分钟），定时批量保存已下载的瓦片进度到数据库
+	progressinterval = 1
 [tm]
 	# mbtiles 文件的名称
-	name = "wuhan-google-satelite"
+	name = "几内亚-google-satelite"
 	# 设置 mbtiles 的最大层级和最小层级
 	min = 0
 	max = 20
@@ -46,17 +48,15 @@
 	# url = "http://mt0.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
 	# Google 卫星地图
 	url = "http://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-	# 其他可能的 URL 模板，如 Mapbox 或 Tianditu 的瓦片服务
-	# url = "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/{z}/{x}/{y}.vector.pbf?sku=1016gFniej06a&access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4M29iazA2Z2gycXA4N2pmbDZmangifQ.-g_vE53SD2WrJ6tFX7QHmA"
-	# url = "https://api.mapbox.com/v4/mapbox.mapbox-terrain-v2/{z}/{x}/{y}.vector.pbf?sku=1016gFniej06a&access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4M29iazA2Z2gycXA4N2pmbDZmangifQ.-g_vE53SD2WrJ6tFX7QHmA"
-	# url = "https://api.maptiler.com/tiles/v3/{z}/{x}/{y}.pbf?key=KDhMfHvorAFkFe64wlZb"
+	# 天地图卫星
 	# url = "https://t0.tianditu.gov.cn/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=75f0434f240669f4a2df6359275146d2"
+	# 天地图瓦片
 	# url = "https://t0.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=75f0434f240669f4a2df6359275146d2"
 
 # lrs 可以为不同级别的瓦片设置不同的边界
 [[lrs]]
   	# 设置 lrs 的最小和最大层级
   	min = 1
-  	max = 20
+  	max = 18
   	# 使用 geojson 文件来定义需要的区域
-  	geojson = "./geojson/wuhan.geojson"
+  	geojson = "./geojson/几内亚.geojson"

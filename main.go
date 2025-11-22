@@ -12,7 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	nested "github.com/antonfisher/nested-logrus-formatter"
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 	"github.com/spf13/viper"
 )
 
@@ -123,7 +123,7 @@ func insertTiles(db *sql.Tx, tiles []TileData) error {
 
 func testDbTask() {
 
-	db, err := sql.Open("sqlite3", "./tiles.db")
+	db, err := sql.Open("sqlite", "./tiles.db")
 	if err != nil {
 		log.Fatal(err)
 	}
