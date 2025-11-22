@@ -1,0 +1,47 @@
+# Git 相关
+.git
+.gitignore
+
+# Docker 相关
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# 构建产物
+tiler
+tiler.exe
+*.exe
+
+# 输出目录
+output/
+*.mbtiles
+
+# 日志文件
+*.log
+tiler.log
+
+# 数据库文件
+*.db
+*.sqlite
+
+# 临时文件
+*.tmp
+*.swp
+*~
+
+# IDE 和编辑器
+.vscode/
+.idea/
+*.sublime-*
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 文档
+README.md
+LICENSE
+*.md
+
+# 测试文件
+*_test.go

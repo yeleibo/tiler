@@ -30,7 +30,7 @@
 	# 是否启用任务恢复，关闭程序后重新打开可以从上次中断的地方继续下载（true=启用, false=禁用）
 	resume = true
 	# 进度保存间隔时间（分钟），定时批量保存已下载的瓦片进度到数据库
-	progressinterval = 1
+	progressinterval = 10
 [tm]
 	# mbtiles 文件的名称
 	name = "几内亚-google-satelite"

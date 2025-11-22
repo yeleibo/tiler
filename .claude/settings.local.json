@@ -14,7 +14,8 @@
       "Bash(go version:*)",
       "Bash(go env:*)",
       "Bash(set CGO_ENABLED=1:*)",
-      "Bash(tiler.exe)"
+      "Bash(tiler.exe)",
+      "Bash(docker build:*)"
     ],
     "deny": [],
     "ask": []
