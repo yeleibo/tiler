@@ -41,6 +41,7 @@ type Task struct {
 	Current            int64
 	Bar                *pb.ProgressBar
 	db                 *sql.DB
+	progressDB         *sql.DB
 	workerCount        int
 	savePipeSize       int
 	timeDelay          int
@@ -52,6 +53,7 @@ type Task struct {
 	tileSet            Set
 	outformat          string
 	skipExisting       bool
+	resume             bool
 }
 
 // NewTask 创建下载任务
@@ -92,6 +94,7 @@ func NewTask(layers []Layer, m TileMap) *Task {
 
 	task.outformat = viper.GetString("output.format")
 	task.skipExisting = viper.GetBool("task.skipexisting")
+	task.resume = viper.GetBool("task.resume")
 	return &task
 }
 
@@ -243,6 +246,12 @@ func (task *Task) tileFetcher(mt maptile.Tile, url string) {
 		<-task.workers //workers完成并清退
 	}()
 
+	// 如果启用了任务恢复，检查进度数据库
+	if task.resume && isTileDownloaded(mt, task.progressDB) {
+		log.Debugf("tile(z:%d, x:%d, y:%d) already downloaded (from progress), skipping...", mt.Z, mt.X, mt.Y)
+		return
+	}
+
 	// 如果启用了跳过已存在瓦片的功能，检查瓦片是否已存在
 	if task.skipExisting {
 		var exists bool
@@ -253,6 +262,10 @@ func (task *Task) tileFetcher(mt maptile.Tile, url string) {
 		}
 		if exists {
 			log.Debugf("tile(z:%d, x:%d, y:%d) already exists, skipping...", mt.Z, mt.X, mt.Y)
+			// 标记为已下载
+			if task.resume {
+				markTileAsDownloaded(mt, task.progressDB)
+			}
 			return
 		}
 	}
@@ -333,6 +346,14 @@ func (task *Task) tileFetcher(mt maptile.Tile, url string) {
 		task.saveTile(td)
 	}
 
+	// 标记瓦片为已下载
+	if task.resume {
+		err = markTileAsDownloaded(mt, task.progressDB)
+		if err != nil {
+			log.Warnf("failed to mark tile as downloaded: %v", err)
+		}
+	}
+
 	cost := time.Since(start).Milliseconds()
 	log.Infof("tile(z:%d, x:%d, y:%d), %dms , %.2f kb, %s ...\n", mt.Z, mt.X, mt.Y, cost, float32(len(body))/1024.0, tile)
 }
@@ -384,6 +405,19 @@ func (task *Task) Download() {
 	// task.Bar.SetRefreshRate(10 * time.Second)
 	// task.Bar.Format("<.- >")
 	task.Bar.Start()
+
+	// 初始化进度数据库
+	if task.resume {
+		err := setupProgressDB(task)
+		if err != nil {
+			log.Warnf("Failed to setup progress database: %v, continuing without resume support", err)
+			task.resume = false
+		} else {
+			defer task.progressDB.Close()
+			log.Info("Progress tracking enabled, task can be resumed after interruption")
+		}
+	}
+
 	if task.outformat == "mbtiles" {
 		task.SetupMBTileTables()
 	} else {

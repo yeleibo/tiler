@@ -19,6 +19,8 @@
 	timedelay = 50
 	# 是否跳过已下载的瓦片，启用后支持断点续传（true=跳过已存在, false=重新下载所有）
 	skipexisting = true
+	# 是否启用任务恢复，关闭程序后重新打开可以从上次中断的地方继续下载（true=启用, false=禁用）
+	resume = true
 [tm]
 	# mbtiles 文件的名称
 	name = "wuhan-google-satelite"
@@ -31,7 +33,10 @@
 	schema = "xyz"
 	# 这部分是瓦片的元数据，TileJSON 格式
 	# json = ""
-	# 瓦片的 URL 模板（此处是 Google 卫星地图）
+	# 瓦片的 URL 模板
+	# Google 标准地图
+	# url = "http://mt0.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+	# Google 卫星地图
 	url = "http://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
 	# 其他可能的 URL 模板，如 Mapbox 或 Tianditu 的瓦片服务
 	# url = "https://api.mapbox.com/v4/mapbox.mapbox-streets-v8/{z}/{x}/{y}.vector.pbf?sku=1016gFniej06a&access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4M29iazA2Z2gycXA4N2pmbDZmangifQ.-g_vE53SD2WrJ6tFX7QHmA"

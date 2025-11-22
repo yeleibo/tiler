@@ -14,6 +14,7 @@ import (
 	"github.com/paulmach/orb/maptile"
 	"github.com/paulmach/orb/maptile/tilecover"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 )
 
 // tileExistsInMBTile 检查瓦片是否已存在于 MBTiles 数据库中
@@ -87,6 +88,67 @@ func optimizeDatabase(db *sql.DB) error {
 	}
 
 	return nil
+}
+
+// setupProgressDB 初始化进度跟踪数据库
+func setupProgressDB(task *Task) error {
+	outdir := viper.GetString("output.directory")
+	os.MkdirAll(outdir, os.ModePerm)
+	progressFile := filepath.Join(outdir, fmt.Sprintf("%s-z%d-%d.progress.db", task.Name, task.Min, task.Max))
+
+	// 如果不启用恢复功能，删除旧的进度文件
+	if !task.resume {
+		os.Remove(progressFile)
+	}
+
+	db, err := sql.Open("sqlite3", progressFile)
+	if err != nil {
+		return err
+	}
+
+	// 创建进度表
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS downloaded_tiles (
+		z INTEGER NOT NULL,
+		x INTEGER NOT NULL,
+		y INTEGER NOT NULL,
+		downloaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (z, x, y)
+	)`)
+	if err != nil {
+		return err
+	}
+
+	// 创建索引加速查询
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_tile ON downloaded_tiles(z, x, y)`)
+	if err != nil {
+		return err
+	}
+
+	task.progressDB = db
+	return nil
+}
+
+// markTileAsDownloaded 标记瓦片为已下载
+func markTileAsDownloaded(tile maptile.Tile, db *sql.DB) error {
+	if db == nil {
+		return nil
+	}
+	_, err := db.Exec("INSERT OR IGNORE INTO downloaded_tiles (z, x, y) VALUES (?, ?, ?)", tile.Z, tile.X, tile.Y)
+	return err
+}
+
+// isTileDownloaded 检查瓦片是否已下载（从进度数据库）
+func isTileDownloaded(tile maptile.Tile, db *sql.DB) bool {
+	if db == nil {
+		return false
+	}
+	var count int
+	row := db.QueryRow("SELECT COUNT(*) FROM downloaded_tiles WHERE z = ? AND x = ? AND y = ?", tile.Z, tile.X, tile.Y)
+	err := row.Scan(&count)
+	if err != nil {
+		return false
+	}
+	return count > 0
 }
 
 func loadFeature(path string) *geojson.Feature {
