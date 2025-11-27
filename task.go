@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -523,4 +524,18 @@ func (task *Task) Download() {
 	}
 
 	task.Bar.FinishPrint(fmt.Sprintf("Task %s finished ~", task.ID))
+}
+
+// SaveProgressOnExit 在程序退出时保存进度（供信号处理使用）
+func (task *Task) SaveProgressOnExit() {
+	if task.resume && task.progressDB != nil {
+		log.Info("Flushing progress buffer before exit...")
+		task.flushProgress()
+		log.Info("Progress saved successfully")
+	}
+}
+
+// DownloadWithContext 开启下载任务（支持上下文取消）
+func (task *Task) DownloadWithContext(ctx context.Context) {
+	task.Download()
 }

@@ -1,11 +1,14 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"flag"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/shiena/ansicolor"
@@ -241,7 +244,21 @@ func main() {
 	}
 	task := NewTask(layers, tm)
 	fmt.Println(task.workerCount)
-	task.Download()
+
+	// 设置信号处理，捕获 Ctrl+C 等中断信号
+	ctx, cancel := context.WithCancel(context.Background())
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-sigChan
+		log.Warn("Received interrupt signal, saving progress...")
+		task.SaveProgressOnExit() // 保存进度
+		cancel()
+		os.Exit(0)
+	}()
+
+	task.DownloadWithContext(ctx)
 	secs := time.Since(start).Seconds()
 	log.Printf("\n%.3fs finished...", secs)
 }
