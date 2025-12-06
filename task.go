@@ -57,9 +57,7 @@ type Task struct {
 	resume             bool
 	progressBuffer       []maptile.Tile
 	progressMutex        sync.Mutex
-	progressTicker       *time.Ticker
-	progressDone         chan struct{}
-	progressInterval     int
+	progressFlushSize    int64 // 每多少个瓦片保存一次进度（按 0.01% 计算）
 }
 
 // NewTask 创建下载任务
@@ -101,11 +99,11 @@ func NewTask(layers []Layer, m TileMap) *Task {
 	task.outformat = viper.GetString("output.format")
 	task.skipExisting = viper.GetBool("task.skipexisting")
 	task.resume = viper.GetBool("task.resume")
-	task.progressInterval = viper.GetInt("task.progressinterval")
 
-	// 设置默认值
-	if task.progressInterval <= 0 {
-		task.progressInterval = 10
+	// 计算 0.01% 对应的瓦片数量（至少为1）
+	task.progressFlushSize = task.Total / 10000
+	if task.progressFlushSize < 1 {
+		task.progressFlushSize = 1
 	}
 
 	return &task
@@ -259,12 +257,6 @@ func (task *Task) tileFetcher(mt maptile.Tile, url string) {
 		<-task.workers //workers完成并清退
 	}()
 
-	// 如果启用了任务恢复，检查进度数据库
-	if task.resume && isTileDownloaded(mt, task.progressDB) {
-		log.Debugf("tile(z:%d, x:%d, y:%d) already downloaded (from progress), skipping...", mt.Z, mt.X, mt.Y)
-		return
-	}
-
 	// 如果启用了跳过已存在瓦片的功能，检查瓦片是否已存在
 	if task.skipExisting {
 		var exists bool
@@ -359,11 +351,17 @@ func (task *Task) tileFetcher(mt maptile.Tile, url string) {
 		task.saveTile(td)
 	}
 
-	// 添加到进度缓冲区（批量写入）
+	// 添加到进度缓冲区（按数量触发批量写入）
 	if task.resume {
 		task.progressMutex.Lock()
 		task.progressBuffer = append(task.progressBuffer, mt)
+		bufLen := int64(len(task.progressBuffer))
 		task.progressMutex.Unlock()
+
+		// 每达到 0.01% 进度时自动刷新
+		if bufLen >= task.progressFlushSize {
+			task.flushProgress()
+		}
 	}
 
 	cost := time.Since(start).Milliseconds()
@@ -372,16 +370,44 @@ func (task *Task) tileFetcher(mt maptile.Tile, url string) {
 
 // DownloadZoom 下载指定层级
 func (task *Task) downloadLayer(layer Layer) {
+	// 如果启用了 resume，先加载该 zoom 级别已下载的瓦片到内存
+	var downloadedSet map[uint64]bool
+	var alreadyDownloaded int64
+	if task.resume && task.progressDB != nil {
+		alreadyDownloaded = getDownloadedCountForZoom(layer.Zoom, task.progressDB)
+		if alreadyDownloaded > 0 {
+			log.Infof("Zoom %d: loading %d downloaded tiles from progress database...", layer.Zoom, alreadyDownloaded)
+			downloadedSet = getDownloadedTilesForZoom(layer.Zoom, task.progressDB)
+			log.Infof("Zoom %d: resuming from %d/%d", layer.Zoom, alreadyDownloaded, layer.Count)
+		}
+	}
+
 	bar := pb.New64(layer.Count).Prefix(fmt.Sprintf("Zoom %d : ", layer.Zoom)).Postfix("\n")
 	// bar.SetRefreshRate(time.Second)
 	bar.Start()
 	// bar.SetMaxWidth(300)
 
+	// 如果有已下载的瓦片，直接跳过进度条
+	if alreadyDownloaded > 0 {
+		bar.Add64(alreadyDownloaded)
+		task.Bar.Add64(alreadyDownloaded)
+	}
+
 	var tilelist = make(chan maptile.Tile, task.bufSize)
 
 	go tilecover.CollectionChannel(layer.Collection, maptile.Zoom(layer.Zoom), tilelist)
 
+	skippedCount := int64(0)
 	for tile := range tilelist {
+		// 使用内存中的 set 快速检查是否已下载
+		if downloadedSet != nil {
+			key := uint64(tile.X)<<32 | uint64(tile.Y)
+			if downloadedSet[key] {
+				skippedCount++
+				continue // 已经在开始时更新过进度条了，这里直接跳过
+			}
+		}
+
 		// log.Infof(`fetching tile %v ~`, tile)
 		select {
 		case task.workers <- tile:
@@ -407,6 +433,9 @@ func (task *Task) downloadLayer(layer Layer) {
 	}
 	//等待该层结束
 	task.tileWG.Wait()
+	if skippedCount > 0 {
+		log.Infof("Zoom %d: skipped %d already downloaded tiles", layer.Zoom, skippedCount)
+	}
 	bar.FinishPrint(fmt.Sprintf("Task %s Zoom %d finished ~", task.ID, layer.Zoom))
 }
 
@@ -432,30 +461,8 @@ func (task *Task) flushProgress() {
 	}
 }
 
-// startProgressFlusher 启动进度刷新定时器
-func (task *Task) startProgressFlusher() {
-	task.progressDone = make(chan struct{})
-	task.progressTicker = time.NewTicker(time.Duration(task.progressInterval) * time.Minute)
-
-	go func() {
-		for {
-			select {
-			case <-task.progressTicker.C:
-				task.flushProgress()
-			case <-task.progressDone:
-				task.progressTicker.Stop()
-				return
-			}
-		}
-	}()
-}
-
-// stopProgressFlusher 停止进度刷新并保存剩余进度
-func (task *Task) stopProgressFlusher() {
-	if task.progressDone != nil {
-		close(task.progressDone)
-	}
-	// 最后刷新一次，保存所有剩余进度
+// flushRemainingProgress 退出时刷新剩余进度
+func (task *Task) flushRemainingProgress() {
 	task.flushProgress()
 }
 
@@ -476,13 +483,13 @@ func (task *Task) Download() {
 			task.resume = false
 		} else {
 			defer task.progressDB.Close()
-			defer task.stopProgressFlusher() // 确保退出时保存所有进度
+			defer task.flushRemainingProgress() // 确保退出时保存所有进度
 			task.progressBuffer = make([]maptile.Tile, 0, 10000)
-			task.startProgressFlusher() // 启动定时刷新
 
-			// 获取上次中断的层级索引
-			startLayerIndex = getResumePoint(task.progressDB)
-			if startLayerIndex > 0 {
+			// 获取上次中断的层级索引（-1 表示无记录，>=0 表示正在下载的层级）
+			resumePoint := getResumePoint(task.progressDB)
+			if resumePoint >= 0 && resumePoint < len(task.Layers) {
+				startLayerIndex = resumePoint
 				log.Infof("Resuming from layer index %d (zoom %d)", startLayerIndex, task.Layers[startLayerIndex].Zoom)
 				// 计算已跳过的瓦片数，更新进度条
 				var skippedCount int64
@@ -494,7 +501,7 @@ func (task *Task) Download() {
 				log.Info("Starting fresh download")
 			}
 			log.Info("Progress tracking enabled, task can be resumed after interruption")
-			log.Infof("Progress will be saved every %d minutes", task.progressInterval)
+			log.Infof("Progress will be saved every 0.01%% (%d tiles)", task.progressFlushSize)
 		}
 	}
 

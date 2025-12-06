@@ -16,7 +16,10 @@
       "Bash(set CGO_ENABLED=1:*)",
       "Bash(tiler.exe)",
       "Bash(docker build:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(sqlite3:*)",
+      "Bash(taskkill:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

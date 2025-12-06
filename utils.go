@@ -101,9 +101,15 @@ func setupProgressDB(task *Task) error {
 		os.Remove(progressFile)
 	}
 
+	log.Debugf("Opening progress database: %s", progressFile)
 	db, err := sql.Open("sqlite", progressFile)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to open progress database: %w", err)
+	}
+
+	// 确保数据库连接有效
+	if err = db.Ping(); err != nil {
+		return fmt.Errorf("failed to ping progress database: %w", err)
 	}
 
 	// 创建进度表
@@ -115,13 +121,14 @@ func setupProgressDB(task *Task) error {
 		PRIMARY KEY (z, x, y)
 	)`)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create downloaded_tiles table: %w", err)
 	}
+	log.Debug("Created downloaded_tiles table")
 
 	// 创建索引加速查询
 	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_tile ON downloaded_tiles(z, x, y)`)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create index: %w", err)
 	}
 
 	// 创建断点记录表，记录当前下载到哪个层级和位置
@@ -131,8 +138,9 @@ func setupProgressDB(task *Task) error {
 		last_update DATETIME DEFAULT CURRENT_TIMESTAMP
 	)`)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create resume_point table: %w", err)
 	}
+	log.Debug("Created resume_point table")
 
 	task.progressDB = db
 	return nil
@@ -202,18 +210,59 @@ func saveResumePoint(layerIndex int, db *sql.DB) error {
 	return err
 }
 
-// getResumePoint 获取上次中断时的层级索引，如果没有记录返回 0
+// getResumePoint 获取上次中断时的层级索引，如果没有记录返回 -1
 func getResumePoint(db *sql.DB) int {
 	if db == nil {
-		return 0
+		return -1
 	}
 	var layerIndex int
 	row := db.QueryRow("SELECT layer_index FROM resume_point WHERE id = 1")
 	err := row.Scan(&layerIndex)
 	if err != nil {
-		return 0 // 没有记录，从头开始
+		return -1 // 没有记录，从头开始
 	}
 	return layerIndex
+}
+
+// getDownloadedTilesForZoom 获取指定 zoom 级别已下载的所有瓦片，返回一个 set 用于快速查找
+func getDownloadedTilesForZoom(zoom int, db *sql.DB) map[uint64]bool {
+	result := make(map[uint64]bool)
+	if db == nil {
+		return result
+	}
+
+	rows, err := db.Query("SELECT x, y FROM downloaded_tiles WHERE z = ?", zoom)
+	if err != nil {
+		log.Warnf("Failed to query downloaded tiles for zoom %d: %v", zoom, err)
+		return result
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var x, y uint32
+		if err := rows.Scan(&x, &y); err != nil {
+			continue
+		}
+		// 用 x<<32 | y 作为唯一 key
+		key := uint64(x)<<32 | uint64(y)
+		result[key] = true
+	}
+
+	return result
+}
+
+// getDownloadedCountForZoom 获取指定 zoom 级别已下载的瓦片数量
+func getDownloadedCountForZoom(zoom int, db *sql.DB) int64 {
+	if db == nil {
+		return 0
+	}
+	var count int64
+	row := db.QueryRow("SELECT COUNT(*) FROM downloaded_tiles WHERE z = ?", zoom)
+	err := row.Scan(&count)
+	if err != nil {
+		return 0
+	}
+	return count
 }
 
 func loadFeature(path string) *geojson.Feature {
