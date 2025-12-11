@@ -112,6 +112,18 @@ func setupProgressDB(task *Task) error {
 		return fmt.Errorf("failed to ping progress database: %w", err)
 	}
 
+	// 设置繁忙超时，避免 SQLITE_BUSY 错误
+	_, err = db.Exec("PRAGMA busy_timeout = 5000")
+	if err != nil {
+		return fmt.Errorf("failed to set busy_timeout: %w", err)
+	}
+
+	// 使用 WAL 模式提高并发性能
+	_, err = db.Exec("PRAGMA journal_mode = WAL")
+	if err != nil {
+		return fmt.Errorf("failed to set journal_mode: %w", err)
+	}
+
 	// 创建进度表
 	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS downloaded_tiles (
 		z INTEGER NOT NULL,

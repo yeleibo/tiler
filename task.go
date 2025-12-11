@@ -55,9 +55,10 @@ type Task struct {
 	outformat          string
 	skipExisting       bool
 	resume             bool
-	progressBuffer       []maptile.Tile
-	progressMutex        sync.Mutex
-	progressFlushSize    int64 // 每多少个瓦片保存一次进度（按 0.01% 计算）
+	progressBuffer     []maptile.Tile
+	progressMutex      sync.Mutex
+	progressTicker     *time.Ticker
+	progressStopChan   chan struct{}
 }
 
 // NewTask 创建下载任务
@@ -99,12 +100,6 @@ func NewTask(layers []Layer, m TileMap) *Task {
 	task.outformat = viper.GetString("output.format")
 	task.skipExisting = viper.GetBool("task.skipexisting")
 	task.resume = viper.GetBool("task.resume")
-
-	// 计算 0.01% 对应的瓦片数量（至少为1）
-	task.progressFlushSize = task.Total / 10000
-	if task.progressFlushSize < 1 {
-		task.progressFlushSize = 1
-	}
 
 	return &task
 }
@@ -351,17 +346,11 @@ func (task *Task) tileFetcher(mt maptile.Tile, url string) {
 		task.saveTile(td)
 	}
 
-	// 添加到进度缓冲区（按数量触发批量写入）
+	// 添加到进度缓冲区（由定时器触发写入）
 	if task.resume {
 		task.progressMutex.Lock()
 		task.progressBuffer = append(task.progressBuffer, mt)
-		bufLen := int64(len(task.progressBuffer))
 		task.progressMutex.Unlock()
-
-		// 每达到 0.01% 进度时自动刷新
-		if bufLen >= task.progressFlushSize {
-			task.flushProgress()
-		}
 	}
 
 	cost := time.Since(start).Milliseconds()
@@ -442,27 +431,49 @@ func (task *Task) downloadLayer(layer Layer) {
 // flushProgress 刷新进度缓冲区到数据库
 func (task *Task) flushProgress() {
 	task.progressMutex.Lock()
+	defer task.progressMutex.Unlock()
+
 	if len(task.progressBuffer) == 0 {
-		task.progressMutex.Unlock()
 		return
 	}
 	// 复制缓冲区并清空
 	tiles := make([]maptile.Tile, len(task.progressBuffer))
 	copy(tiles, task.progressBuffer)
 	task.progressBuffer = task.progressBuffer[:0]
-	task.progressMutex.Unlock()
 
-	// 批量写入数据库
+	// 批量写入数据库（在锁内执行，避免并发事务冲突）
 	err := batchMarkTilesAsDownloaded(tiles, task.progressDB)
 	if err != nil {
 		log.Warnf("failed to batch save progress (%d tiles): %v", len(tiles), err)
 	} else {
-		log.Debugf("progress saved: %d tiles", len(tiles))
+		log.Infof("progress saved: %d tiles", len(tiles))
 	}
 }
 
-// flushRemainingProgress 退出时刷新剩余进度
-func (task *Task) flushRemainingProgress() {
+// startProgressTicker 启动进度保存定时器（每分钟写入一次）
+func (task *Task) startProgressTicker() {
+	task.progressTicker = time.NewTicker(1 * time.Minute)
+	task.progressStopChan = make(chan struct{})
+
+	go func() {
+		for {
+			select {
+			case <-task.progressTicker.C:
+				task.flushProgress()
+			case <-task.progressStopChan:
+				return
+			}
+		}
+	}()
+}
+
+// stopProgressTicker 停止进度保存定时器并保存剩余进度
+func (task *Task) stopProgressTicker() {
+	if task.progressTicker != nil {
+		task.progressTicker.Stop()
+		close(task.progressStopChan)
+	}
+	// 保存剩余的进度
 	task.flushProgress()
 }
 
@@ -483,7 +494,7 @@ func (task *Task) Download() {
 			task.resume = false
 		} else {
 			defer task.progressDB.Close()
-			defer task.flushRemainingProgress() // 确保退出时保存所有进度
+			defer task.stopProgressTicker() // 确保退出时停止定时器并保存所有进度
 			task.progressBuffer = make([]maptile.Tile, 0, 10000)
 
 			// 获取上次中断的层级索引（-1 表示无记录，>=0 表示正在下载的层级）
@@ -501,7 +512,10 @@ func (task *Task) Download() {
 				log.Info("Starting fresh download")
 			}
 			log.Info("Progress tracking enabled, task can be resumed after interruption")
-			log.Infof("Progress will be saved every 0.01%% (%d tiles)", task.progressFlushSize)
+			log.Info("Progress will be saved every 1 minute")
+
+			// 启动定时保存进度
+			task.startProgressTicker()
 		}
 	}
 
@@ -536,8 +550,8 @@ func (task *Task) Download() {
 // SaveProgressOnExit 在程序退出时保存进度（供信号处理使用）
 func (task *Task) SaveProgressOnExit() {
 	if task.resume && task.progressDB != nil {
-		log.Info("Flushing progress buffer before exit...")
-		task.flushProgress()
+		log.Info("Stopping progress ticker and saving remaining progress...")
+		task.stopProgressTicker()
 		log.Info("Progress saved successfully")
 	}
 }

@@ -31,12 +31,12 @@
 	resume = true
 [tm]
 	# mbtiles 文件的名称
-	name = "deqing-tianditu-satelite"
+	name = "zhangzhou-tianditu-satelite"
 	# 设置 mbtiles 的最大层级和最小层级
 	min = 0
-	max = 13
+	max = 17
 	# 输出的图像格式，可以是 pbf（矢量图），png 或 jpg（栅格图）
-	format = "jpg"
+	format = "png"
 	# 使用的瓦片方案，通常是 xyz 或 tm
 	schema = "xyz"
 	# 这部分是瓦片的元数据，TileJSON 格式
@@ -46,15 +46,15 @@
 	# url = "http://mt0.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
 	# Google 卫星地图
 	# url = "http://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-	# 天地图卫星
+	# 天地图标准
 	#url = "https://t0.tianditu.gov.cn/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=75f0434f240669f4a2df6359275146d2"
-	# 天地图瓦片
+	# 天地图卫星
 	 url = "https://t0.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=75f0434f240669f4a2df6359275146d2"
 
 # lrs 可以为不同级别的瓦片设置不同的边界
 [[lrs]]
   	# 设置 lrs 的最小和最大层级
   	min = 0
-  	max = 13
+  	max = 17
   	# 使用 geojson 文件来定义需要的区域
-  	geojson = "./geojson/deqing.geojson"
+  	geojson = "./geojson/漳州市.geojson"
