@@ -1,0 +1,60 @@
+[app]
+	# 应用版本
+	version = "v 0.1.0"
+	# 应用标题
+	title = "MapCloud Tiler"
+
+[log]
+	# 是否启用日志文件记录（true=启用, false=仅输出到控制台）
+	enable = true
+	# 日志文件路径（相对或绝对路径）
+	file = "tiler.log"
+	# 日志级别：debug, info, warn, error（只有大于等于此级别的日志会被记录）
+	level = "debug"
+
+[output]
+	# 输出格式，可以是 mbtiles 或者文件
+	format = "file"
+	# 输出的目录
+	directory = "./"
+
+[task]
+	# 并发下载线程数，控制同时进行的HTTP请求数量（建议1-50，过大可能被服务器限流）
+	workers = 30
+	# 保存队列缓冲区大小，仅对mbtiles格式有效，控制等待写入数据库的瓦片数量
+	savepipe = 200
+	# 发送请求的时间间隔（毫秒），用于控制下载速度，避免请求过快被服务器封禁
+	timedelay = 50
+	# 是否跳过已下载的瓦片，启用后支持断点续传（true=跳过已存在, false=重新下载所有）
+	skipexisting = true
+	# 是否启用任务恢复，关闭程序后重新打开可以从上次中断的地方继续下载（true=启用, false=禁用）
+	resume = true
+[tm]
+	# mbtiles 文件的名称
+	name = "背景地图"
+	# 设置 mbtiles 的最大层级和最小层级
+	min = 0
+	max = 20
+	# 输出的图像格式，可以是 pbf（矢量图），png 或 jpg（栅格图）
+	format = "png"
+	# 使用的瓦片方案，通常是 xyz 或 tm
+	schema = "xyz"
+	# 这部分是瓦片的元数据，TileJSON 格式
+	# json = ""
+	# 瓦片的 URL 模板
+	# Google 标准地图
+	# url = "http://mt0.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+	# Google 卫星地图
+	 url = "http://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+	# 天地图标准
+	#url = "https://t0.tianditu.gov.cn/DataServer?T=vec_w&x={x}&y={y}&l={z}&tk=75f0434f240669f4a2df6359275146d2"
+	# 天地图卫星
+	# url = "https://t0.tianditu.gov.cn/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=75f0434f240669f4a2df6359275146d2"
+
+# lrs 可以为不同级别的瓦片设置不同的边界
+[[lrs]]
+  	# 设置 lrs 的最小和最大层级
+  	min = 0
+  	max = 20
+  	# 使用 geojson 文件来定义需要的区域
+  	geojson = "./背景地图.geojson"

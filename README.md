@@ -67,3 +67,6 @@ https://datav.aliyun.com/portal/school/atlas/area_selector
 https://nominatim.openstreetmap.org/search?q=%E6%AD%A6%E6%B1%89%E6%B1%9F%E6%B1%89%E5%8C%BA%E5%89%8D%E8%BF%9B%E8%A1%97%E9%81%93&polygon_geojson=1&format=jsonv2
 
 把里面的q换成具体的关键字，结果检查"display_name":"前进街道, 江汉区, 武汉市, 湖北省, 中国" 看是否是自己需要的，然后将数据保存到geojson文件中
+
+### 手动框选范围
+https://geojson.io/#map=13.42/22.6365/113.6574
