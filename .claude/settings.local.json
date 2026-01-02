@@ -19,7 +19,9 @@
       "Bash(git rm:*)",
       "Bash(sqlite3:*)",
       "Bash(taskkill:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

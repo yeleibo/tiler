@@ -31,7 +31,7 @@
 	resume = true
 [tm]
 	# mbtiles 文件的名称
-	name = "背景地图"
+	name = "几内亚-卫星"
 	# 设置 mbtiles 的最大层级和最小层级
 	min = 0
 	max = 20
@@ -57,4 +57,4 @@
   	min = 0
   	max = 20
   	# 使用 geojson 文件来定义需要的区域
-  	geojson = "./geojson/背景地图.geojson"
+  	geojson = "./geojson/jineiya.geojson"

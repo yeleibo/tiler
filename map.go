@@ -51,8 +51,8 @@ func GetTileMapList() map[int]TileMap {
 
 // TileURL 获取瓦片URL
 func (m TileMap) getTileURL(t maptile.Tile) string {
-	url := strings.Replace(m.URL, "{x}", strconv.Itoa(int(t.X)), -1)
-	url = strings.Replace(url, "{y}", strconv.Itoa(int(t.Y)), -1)
+	url := strings.Replace(m.URL, "{x}", strconv.Itoa(int(t.Y)), -1)
+	url = strings.Replace(url, "{y}", strconv.Itoa(int(t.X)), -1)
 	url = strings.Replace(url, "{z}", strconv.Itoa(int(t.Z)), -1)
 	return url
 }
