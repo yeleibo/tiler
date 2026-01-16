@@ -35,9 +35,9 @@ for /l %%i in (1,1,%zCount%) do (
 )
 
 echo ------------------------------------------------
-echo 共转换 %totalFileCount% 个文件
+echo Total converted: %totalFileCount% files
 if %totalErrorCount% gtr 0 (
-    echo 错误: %totalErrorCount% 个文件转换失败
+    echo Errors: %totalErrorCount% files failed
 )
 
 echo ------------------------------------------------
@@ -78,19 +78,19 @@ for /d %%x in ("%zLevel%\*") do (
 set "logFile=%workDir%zxy2zyx_z%zLevel%_%timestamp%.log"
 (
     echo ========================================
-    echo 瓦片转换日志 - 层级 %zLevel%
+    echo Tile Conversion Log - Level %zLevel%
     echo ========================================
-    echo 转换时间: %date% %time%
-    echo 工作目录: %workDir%
-    echo 层级编号: %zLevel%
-    echo 转换结构: z/x/y -^> z/y/x
+    echo Time: %date% %time%
+    echo WorkDir: %workDir%
+    echo Level: %zLevel%
+    echo Structure: z/x/y -^> z/y/x
     echo ----------------------------------------
-    echo 成功转换: !zFileCount! 个文件
-    echo 转换失败: !zErrorCount! 个文件
+    echo Success: !zFileCount! files
+    echo Failed: !zErrorCount! files
     echo ========================================
 ) > "!logFile!"
 
-echo   ^> 已生成日志: zxy2zyx_z%zLevel%_%timestamp%.log
+echo   ^> Log saved: zxy2zyx_z%zLevel%_%timestamp%.log
 echo.
 
 :: 更新全局计数器
@@ -141,7 +141,7 @@ endlocal & (
     set /a zFileCount+=%batchCount%
     if %batchCount% gtr 0 if %totalFileCount% lss 10 (
         set /a totalFileCount+=%batchCount%
-        echo   已处理 %xName%: %batchCount% 个文件
+        echo   Processed %xName%: %batchCount% files
     )
 )
 goto :eof
