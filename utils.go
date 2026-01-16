@@ -34,7 +34,7 @@ func tileExistsInMBTile(tile maptile.Tile, db *sql.DB) bool {
 
 // tileExistsInFiles 检查瓦片文件是否已存在于文件系统中
 func tileExistsInFiles(tile maptile.Tile, task *Task) bool {
-	fileName := filepath.Join(task.File, fmt.Sprintf(`%d`, tile.Z), fmt.Sprintf(`%d`, tile.Y), fmt.Sprintf(`%d.%s`, tile.X, task.TileMap.Format))
+	fileName := filepath.Join(task.File, fmt.Sprintf(`%d`, tile.Z), fmt.Sprintf(`%d`, tile.X), fmt.Sprintf(`%d.%s`, tile.Y, task.TileMap.Format))
 	_, err := os.Stat(fileName)
 	return err == nil
 }
@@ -49,9 +49,9 @@ func saveToMBTile(tile Tile, db *sql.DB) error {
 }
 
 func saveToFiles(tile Tile, task *Task) error {
-	dir := filepath.Join(task.File, fmt.Sprintf(`%d`, tile.T.Z), fmt.Sprintf(`%d`, tile.T.Y))
+	dir := filepath.Join(task.File, fmt.Sprintf(`%d`, tile.T.Z), fmt.Sprintf(`%d`, tile.T.X))
 	os.MkdirAll(dir, os.ModePerm)
-	fileName := filepath.Join(dir, fmt.Sprintf(`%d.%s`, tile.T.X, task.TileMap.Format))
+	fileName := filepath.Join(dir, fmt.Sprintf(`%d.%s`, tile.T.Y, task.TileMap.Format))
 	err := os.WriteFile(fileName, tile.C, os.ModePerm)
 	if err != nil {
 		return err
