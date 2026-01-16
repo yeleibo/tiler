@@ -11,12 +11,20 @@ echo 正在开始转换瓦片结构 [z/x/y -^> z/y/x]...
 echo 工作目录: %workDir%
 echo ------------------------------------------------
 
-set "fileCount=0"
-set "errorCount=0"
+set "totalFileCount=0"
+set "totalErrorCount=0"
+
+:: 获取当前时间戳用于日志文件名
+set "timestamp=%date:~0,4%%date:~5,2%%date:~8,2%_%time:~0,2%%time:~3,2%%time:~6,2%"
+set "timestamp=%timestamp: =0%"
 
 :: 1. 遍历所有 z 文件夹下的 png 文件
 for /d %%z in (*) do (
     if exist "%%z\" (
+        set "zLevel=%%z"
+        set "zFileCount=0"
+        set "zErrorCount=0"
+
         echo 正在处理层级: %%z
 
         :: 遍历 z/x 结构
@@ -39,19 +47,43 @@ for /d %%z in (*) do (
                     :: 移动文件并统一添加 .png 后缀
                     move /y "%%y" "!newPath!" >nul 2>&1
                     if !errorlevel! equ 0 (
-                        set /a fileCount+=1
-                        if !fileCount! leq 10 (
-                            echo   [!fileCount!] %%z/%%~nx/%%~ny!ext! -^> !newPath!
+                        set /a zFileCount+=1
+                        set /a totalFileCount+=1
+                        if !totalFileCount! leq 10 (
+                            echo   [!totalFileCount!] %%z/%%~nx/%%~ny!ext! -^> !newPath!
                         )
                     ) else (
-                        set /a errorCount+=1
+                        set /a zErrorCount+=1
+                        set /a totalErrorCount+=1
                         echo   [错误] 无法移动: %%y
                     )
                 )
             )
         )
+
+        :: 生成该层级的日志文件
+        set "logFile=%workDir%zxy2zyx_z!zLevel!_%timestamp%.log"
+        (
+            echo ========================================
+            echo 瓦片转换日志 - 层级 !zLevel!
+            echo ========================================
+            echo 转换时间: %date% %time%
+            echo 工作目录: %workDir%
+            echo 层级编号: !zLevel!
+            echo 转换结构: z/x/y -^> z/y/x
+            echo ----------------------------------------
+            echo 成功转换: !zFileCount! 个文件
+            echo 转换失败: !zErrorCount! 个文件
+            echo ========================================
+        ) > "!logFile!"
+
+        echo   ^> 已生成日志: zxy2zyx_z!zLevel!_%timestamp%.log
+        echo.
     )
 )
+
+set "fileCount=!totalFileCount!"
+set "errorCount=!totalErrorCount!"
 
 echo ------------------------------------------------
 if !fileCount! gtr 10 (
