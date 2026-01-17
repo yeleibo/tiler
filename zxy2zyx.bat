@@ -7,7 +7,14 @@ setlocal enabledelayedexpansion
 set "workDir=%~dp0"
 cd /d "%workDir%"
 
-echo 正在开始转换瓦片结构 [z/x/y -^> z/y/x]...
+:: 检查是否传入了 z 参数
+set "targetZ=%~1"
+
+if defined targetZ (
+    echo 正在开始转换瓦片结构 [z/x/y -^> z/y/x] - 仅处理层级 %targetZ%...
+) else (
+    echo 正在开始转换瓦片结构 [z/x/y -^> z/y/x] - 处理所有层级...
+)
 echo 工作目录: %workDir%
 echo ------------------------------------------------
 
@@ -15,7 +22,14 @@ set "fileCount=0"
 set "errorCount=0"
 
 :: 1. 遍历所有 z 文件夹下的 png 文件
-for /d %%z in (*) do (
+:: 如果指定了 targetZ，只处理该层级；否则处理所有层级
+if defined targetZ (
+    set "zPattern=%targetZ%"
+) else (
+    set "zPattern=*"
+)
+
+for /d %%z in (!zPattern!) do (
     if exist "%%z\" (
         echo 正在处理层级: %%z
 
